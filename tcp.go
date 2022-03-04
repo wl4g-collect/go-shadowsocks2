@@ -32,7 +32,7 @@ func tcpTun(addr, server, target string, shadow func(net.Conn) net.Conn) {
 
 // Listen on addr and proxy to server to reach target from getAddr.
 func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(net.Conn) (socks.Addr, error)) {
-	l, err := net.Listen("tcp", addr)
+	l, err := net.Listen("tcp4", addr)
 	if err != nil {
 		logf("failed to listen on %s: %v", addr, err)
 		return
@@ -94,7 +94,7 @@ func tcpLocal(addr, server string, shadow func(net.Conn) net.Conn, getAddr func(
 
 // Listen on addr for incoming connections.
 func tcpRemote(addr string, shadow func(net.Conn) net.Conn) {
-	l, err := net.Listen("tcp", addr)
+	l, err := net.Listen("tcp4", addr)
 	if err != nil {
 		logf("failed to listen on %s: %v", addr, err)
 		return
