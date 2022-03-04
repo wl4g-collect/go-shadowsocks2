@@ -1,0 +1,126 @@
+#!/bin/bash
+##
+## see: https://pkg.go.dev/github.com/shadowsocks/go-shadowsocks2#readme-client
+
+## Socks configuration.
+export SOCKS_SERVER_IP=${SOCKS_SERVER_IP:-'47.241.75.114'}
+export SOCKS_SERVER_PORT=${SOCKS_SERVER_PORT:-'28472'}
+export SOCKS_CIPHER_ALG=${SOCKS_CIPHER_ALG:-'AEAD_CHACHA20_POLY1305'}
+export SOCKS_SERVER_PASSWORD=${SOCKS_SERVER_PASSWORD:-'abcd1234%2F'}
+
+EXEC_CMD=$(command -v shadowsocks2-linux)
+
+function getPids() {
+  PIDS=$(ps ax | grep shadowsocks | grep -i ${EXEC_CMD} | grep -v grep | awk '{print $1}')
+  echo $PIDS
+  return 0
+}
+
+function status() {
+  local filtering=$1
+  if [ -n "$filtering" ]; then
+    ps -ef | grep -v grep | grep ${EXEC_CMD} | grep "$filtering"
+  else
+    ps -ef | grep -v grep | grep ${EXEC_CMD}
+  fi
+}
+
+function start() {
+  PIDS=$(getPids)
+  if [ -z "$PIDS" ]; then
+    local startType=$1
+    case $startType in
+    -s|--server)
+      echo -n "Starting shadowsocks2 server ..."
+      startCmd="${EXEC_CMD} -s ss://${SOCKS_CIPHER_ALG}:${SOCKS_SERVER_PASSWORD}@:${SOCKS_SERVER_PORT}"
+      nohup ${startCmd} -verbose >/dev/null 2>&1 &
+    ;;
+    -c|--client)
+      echo -n "Starting shadowsocks2 client ..."
+      startCmd="${EXEC_CMD} -c ss://${SOCKS_CIPHER_ALG}:${SOCKS_SERVER_PASSWORD}@${SOCKS_SERVER_IP}:${SOCKS_SERVER_PORT} -socks :1080"
+      nohup ${startCmd} -verbose >/dev/null 2>&1 &
+    ;;
+    *)
+      printUsage
+      exit 1
+    ;;
+    esac
+
+    ## Print progress.
+    while true
+    do
+      PIDS=$(getPids)
+      if [ "$PIDS" == "" ]; then
+        echo -n ".";
+        sleep 0.8;
+      else
+        break;
+      fi
+    done
+    echo -e "\nStarted shadowsocks2 on $PIDS"
+  else
+    echo "Running shadowsocks2 is $PIDS"
+  fi
+}
+
+function stop(){
+  PIDS=$(getPids)
+  if [ -z "$PIDS" ]; then
+    echo "No shadowsocks2 running!"
+  else
+    echo -n "Stopping shadowsocks2 for $PIDS ..."
+    kill -s TERM $PIDS
+    while true
+    do
+      PIDS=$(getPids)
+      if [ "$PIDS" != "" ]; then
+        echo -n "."
+        sleep 0.8
+      else
+        break
+      fi
+    done
+    echo -e "\nStopped shadowsocks2."
+  fi
+}
+
+function printUsage() {
+  echo "
+Usage: ./$(basename $0) <COMMAND> <ARGS>
+  start    Start shadowsocks2 server or client.
+           [-c|--client] or [-s|--server]
+  stop     Stop shadowsocks2 server or client.
+  status   Print shadowsocks2 server or client running information."
+}
+
+function main() {
+  local cmd=$1
+  local arg1=$2
+  case $cmd in
+    status)
+      status
+    ;;
+    start)
+      case $arg1 in         
+      -s|--server) 
+        start "--server"
+      ;;           
+      -c|--client) 
+        start "--client"
+      ;;           
+      *)
+        printUsage
+        exit 1     
+      esac 
+    ;;
+    stop)
+      stop
+    ;;
+    *)
+      printUsage
+      exit 2
+  esac
+}
+
+## ----- Main. -----
+main "$@"
